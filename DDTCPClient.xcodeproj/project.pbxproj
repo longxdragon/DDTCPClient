@@ -562,7 +562,7 @@
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = DDTCPClient/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				PRODUCT_BUNDLE_IDENTIFIER = com.finance.sojex;
+				PRODUCT_BUNDLE_IDENTIFIER = com.longxdrgon.DDTCPClient;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE = "6f3dd4aa-398d-46d1-8e43-a58281411a40";
 				PROVISIONING_PROFILE_SPECIFIER = "Development:com.finance.sojex";
@@ -580,7 +580,7 @@
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = DDTCPClient/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				PRODUCT_BUNDLE_IDENTIFIER = com.finance.sojex;
+				PRODUCT_BUNDLE_IDENTIFIER = com.longxdrgon.DDTCPClient;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE = "6f3dd4aa-398d-46d1-8e43-a58281411a40";
 				PROVISIONING_PROFILE_SPECIFIER = "Development:com.finance.sojex";
