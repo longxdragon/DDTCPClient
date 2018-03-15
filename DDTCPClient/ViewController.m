@@ -9,7 +9,6 @@
 #import "ViewController.h"
 #import "DDTCPClient.h"
 
-#import <DDCryptor/DDCryptor.h>
 
 @interface ViewController () <DDTCPClientDelegate>
 
@@ -38,8 +37,8 @@ NSString *JSONString(id obj) {
     [super viewDidLoad];
     // Do any additional setup after loading the view, typically from a nib.
     
-    _host = @"192.168.1.132";//@"211.151.144.74";//
-    _port = 9011;//1235;//
+    _host = @"192.168.1.132";
+    _port = 9011;
     
     
     DDTCPClient *socket = [[DDTCPClient alloc] init];
@@ -50,19 +49,13 @@ NSString *JSONString(id obj) {
     _socket = socket;
     
     
-    long long time = (long long)[[NSDate date] timeIntervalSince1970] * 1000;
-    NSString *auth = [NSString stringWithFormat:@"%lld_KOUDAITCP", time];
-    NSString *enAuth = [auth dd_3desEncryptWithKey:@"lPrzT8BMoJt2dUSslfwn3Vkl" iv:@"sojexcom"];
-    
-    NSDictionary *dic = @{ @"type" : @"subcribe", @"auth" : enAuth ?: @"", @"ids" : @[@"12", @"194", @"195"]};
-    NSString *registStr = JSONString(dic);
+    NSString *registStr = @"I'm register informations";
     NSData *registData = [registStr dataUsingEncoding:NSUTF8StringEncoding];
     
     [socket sendData:registData];
     
     
-    NSDictionary *heart = @{ @"type" : @"heartbeat" };
-    NSString *heartStr = JSONString(heart);
+    NSString *heartStr = @"I'm heart informations";
     NSData *heartData = [heartStr dataUsingEncoding:NSUTF8StringEncoding];
 
     [socket setHeartData:heartData];

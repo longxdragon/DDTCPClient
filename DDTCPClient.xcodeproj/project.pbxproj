@@ -9,8 +9,6 @@
 /* Begin PBXBuildFile section */
 		3DA9DC5A204FE40100DA934E /* DDAsyncSocket.m in Sources */ = {isa = PBXBuildFile; fileRef = 3DA9DC52204FE40100DA934E /* DDAsyncSocket.m */; };
 		3DA9DC5B204FE40100DA934E /* DDTCPClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 3DA9DC54204FE40100DA934E /* DDTCPClient.m */; };
-		3DA9DC5C204FE40100DA934E /* GCDAsyncSocket.m in Sources */ = {isa = PBXBuildFile; fileRef = 3DA9DC57204FE40100DA934E /* GCDAsyncSocket.m */; };
-		3DA9DC5D204FE40100DA934E /* GCDAsyncUdpSocket.m in Sources */ = {isa = PBXBuildFile; fileRef = 3DA9DC59204FE40100DA934E /* GCDAsyncUdpSocket.m */; };
 		3DB790E720427B2E00D56BBD /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 3DB790E620427B2E00D56BBD /* AppDelegate.m */; };
 		3DB790EA20427B2E00D56BBD /* ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 3DB790E920427B2E00D56BBD /* ViewController.m */; };
 		3DB790ED20427B2E00D56BBD /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 3DB790EB20427B2E00D56BBD /* Main.storyboard */; };
@@ -46,10 +44,6 @@
 		3DA9DC52204FE40100DA934E /* DDAsyncSocket.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DDAsyncSocket.m; sourceTree = "<group>"; };
 		3DA9DC53204FE40100DA934E /* DDTCPClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DDTCPClient.h; sourceTree = "<group>"; };
 		3DA9DC54204FE40100DA934E /* DDTCPClient.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DDTCPClient.m; sourceTree = "<group>"; };
-		3DA9DC56204FE40100DA934E /* GCDAsyncSocket.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GCDAsyncSocket.h; sourceTree = "<group>"; };
-		3DA9DC57204FE40100DA934E /* GCDAsyncSocket.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GCDAsyncSocket.m; sourceTree = "<group>"; };
-		3DA9DC58204FE40100DA934E /* GCDAsyncUdpSocket.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GCDAsyncUdpSocket.h; sourceTree = "<group>"; };
-		3DA9DC59204FE40100DA934E /* GCDAsyncUdpSocket.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GCDAsyncUdpSocket.m; sourceTree = "<group>"; };
 		3DB790E220427B2E00D56BBD /* DDTCPClient.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DDTCPClient.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3DB790E520427B2E00D56BBD /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		3DB790E620427B2E00D56BBD /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
@@ -110,20 +104,8 @@
 				3DA9DC52204FE40100DA934E /* DDAsyncSocket.m */,
 				3DA9DC53204FE40100DA934E /* DDTCPClient.h */,
 				3DA9DC54204FE40100DA934E /* DDTCPClient.m */,
-				3DA9DC55204FE40100DA934E /* GCDAsyncSocket */,
 			);
 			path = DDTCPClient;
-			sourceTree = "<group>";
-		};
-		3DA9DC55204FE40100DA934E /* GCDAsyncSocket */ = {
-			isa = PBXGroup;
-			children = (
-				3DA9DC56204FE40100DA934E /* GCDAsyncSocket.h */,
-				3DA9DC57204FE40100DA934E /* GCDAsyncSocket.m */,
-				3DA9DC58204FE40100DA934E /* GCDAsyncUdpSocket.h */,
-				3DA9DC59204FE40100DA934E /* GCDAsyncUdpSocket.m */,
-			);
-			path = GCDAsyncSocket;
 			sourceTree = "<group>";
 		};
 		3DB790D920427B2E00D56BBD = {
@@ -387,11 +369,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3DA9DC5C204FE40100DA934E /* GCDAsyncSocket.m in Sources */,
 				3DB790EA20427B2E00D56BBD /* ViewController.m in Sources */,
 				3DA9DC5A204FE40100DA934E /* DDAsyncSocket.m in Sources */,
 				3DB790F520427B2E00D56BBD /* main.m in Sources */,
-				3DA9DC5D204FE40100DA934E /* GCDAsyncUdpSocket.m in Sources */,
 				3DB790E720427B2E00D56BBD /* AppDelegate.m in Sources */,
 				3DA9DC5B204FE40100DA934E /* DDTCPClient.m in Sources */,
 			);
