@@ -7,7 +7,7 @@
 //
 
 #import "DDAsyncSocket.h"
-#import <GCDAsyncSocket.h>
+#import <CocoaAsyncSocket/GCDAsyncSocket.h>
 
 @interface DDAsyncSocket () <GCDAsyncSocketDelegate>
 @property (nonatomic) GCDAsyncSocket *socket;
