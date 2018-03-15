@@ -18,6 +18,7 @@ Pod::Spec.new do |s|
   s.requires_arc = true
 
   s.dependency 'CocoaAsyncSocket', '~> 7.6.2'
+  s.dependency 'AFNetworking', '~> 3.0'
 
   # s.static_framework = true
 
