@@ -1,35 +1,15 @@
 PODS:
-  - AFNetworking (2.6.3):
-    - AFNetworking/NSURLConnection (= 2.6.3)
-    - AFNetworking/NSURLSession (= 2.6.3)
-    - AFNetworking/Reachability (= 2.6.3)
-    - AFNetworking/Security (= 2.6.3)
-    - AFNetworking/Serialization (= 2.6.3)
-    - AFNetworking/UIKit (= 2.6.3)
-  - AFNetworking/NSURLConnection (2.6.3):
-    - AFNetworking/Reachability
-    - AFNetworking/Security
-    - AFNetworking/Serialization
-  - AFNetworking/NSURLSession (2.6.3):
-    - AFNetworking/Reachability
-    - AFNetworking/Security
-    - AFNetworking/Serialization
-  - AFNetworking/Reachability (2.6.3)
-  - AFNetworking/Security (2.6.3)
-  - AFNetworking/Serialization (2.6.3)
-  - AFNetworking/UIKit (2.6.3):
-    - AFNetworking/NSURLConnection
-    - AFNetworking/NSURLSession
   - CocoaAsyncSocket (7.6.2)
+  - Reachability (3.2)
 
 DEPENDENCIES:
-  - AFNetworking (~> 2.0)
   - CocoaAsyncSocket (~> 7.6.2)
+  - Reachability
 
 SPEC CHECKSUMS:
-  AFNetworking: cb8d14a848e831097108418f5d49217339d4eb60
   CocoaAsyncSocket: 3541e024f48c54b251638ef72d51dd42808de932
+  Reachability: 33e18b67625424e47b6cde6d202dce689ad7af96
 
-PODFILE CHECKSUM: c32df4a87a24a3ca9419f313348a76f1c1d95d99
+PODFILE CHECKSUM: e33bdbacd9999a163b756565570f1543c6a156d7
 
 COCOAPODS: 1.4.0

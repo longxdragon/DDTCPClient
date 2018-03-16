@@ -8,13 +8,13 @@
 
 #import "DDTCPClient.h"
 #import "DDAsyncSocket.h"
-#import <AFNetworking/AFNetworkReachabilityManager.h>
+#import <Reachability/Reachability.h>
 
 @interface DDTCPClient () <DDAsyncSocketDelegate>
 @property (nonatomic, strong) DDAsyncSocket *socket;
 @property (nonatomic, assign) NSInteger reconnectFlag;
 @property (nonatomic, assign) BOOL needReconnect;
-@property (nonatomic, strong) AFNetworkReachabilityManager *manager;
+@property (nonatomic, strong) Reachability *reach;
 @property (nonatomic, assign) BOOL networkReachable;
 @end
 
@@ -32,6 +32,7 @@
         self.reconnectFlag = 0;
         self.isDebug = NO;
         self.networkReachable = YES;
+        self.needReconnect = YES;
     }
     return self;
 }
@@ -151,35 +152,29 @@
 - (void)_startMonitoring {
     [self _stopMonitoring];
     
-    self.manager = [AFNetworkReachabilityManager managerForDomain:self.socket.socketHost];
-    self.networkReachable = self.manager.reachable;
+    self.reach = [Reachability reachabilityWithHostname:self.socket.socketHost];
+    self.networkReachable = self.reach.isReachable;
     
     __weak typeof(self) wself = self;
-    [self.manager setReachabilityStatusChangeBlock:^(AFNetworkReachabilityStatus status) {
+    self.reach.reachableBlock = ^(Reachability *reachability) {
         __strong typeof(self) sself = wself;
         if (!sself) {
             return;
         }
-        
-        switch (status) {
-            case AFNetworkReachabilityStatusUnknown: break;
-            case AFNetworkReachabilityStatusNotReachable: {
-                sself.networkReachable = NO;
-            } break;
-            case AFNetworkReachabilityStatusReachableViaWWAN:
-            case AFNetworkReachabilityStatusReachableViaWiFi: {
-                sself.networkReachable = YES;
-                // Reconnect
-                [sself _reconnect];
-            } break;
+        sself.networkReachable = reachability.isReachable;
+        // Reconnect
+        if (reachability.isReachable) {
+            [sself _reconnect];
         }
-    }];
-    [self.manager startMonitoring];
+    };
+    
+    
+    [self.reach startNotifier];
 }
 
 - (void)_stopMonitoring {
-    [self.manager stopMonitoring];
-    [self setManager:nil];
+    [self.reach stopNotifier];
+    [self setReach:nil];
 }
 
 #pragma mark - Send Heart
