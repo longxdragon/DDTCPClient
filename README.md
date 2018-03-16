@@ -30,32 +30,32 @@ DDTCPClient is a high level socket util based on [CocoaAsyncSocket](https://gith
 ### Initialization 
 
 ```objc
-    DDTCPClient *socket = [[DDTCPClient alloc] init];
-    socket.delegate = self;
+DDTCPClient *socket = [[DDTCPClient alloc] init];
+socket.delegate = self;
 ```
 ### Connect and disconnect
 
 ```objc
-    // Connect
-    [socket connectHost:host port:port];
+// Connect
+[socket connectHost:host port:port];
     
-    // Disconnect
-    [socket disConnect];
+// Disconnect
+[socket disConnect];
 ```
 ### Sent heart or send data
 
 ```objc
-    // Send data
-    NSString *registStr = @"I'm register informations";
-    NSData *registData = [registStr dataUsingEncoding:NSUTF8StringEncoding];
+// Send data
+NSString *registStr = @"I'm register informations";
+NSData *registData = [registStr dataUsingEncoding:NSUTF8StringEncoding];
     
-    [socket sendData:registData];
+[socket sendData:registData];
 
-    // Sent heart, just set once, heart data will be send one by one
-    NSString *heartStr = @"I'm heart informations";
-    NSData *heartData = [heartStr dataUsingEncoding:NSUTF8StringEncoding];
+// Sent heart, just set once, heart data will be send one by one
+NSString *heartStr = @"I'm heart informations";
+NSData *heartData = [heartStr dataUsingEncoding:NSUTF8StringEncoding];
     
-    [socket setHeartData:heartData];
+[socket setHeartData:heartData];
 ```
 
 Requirements
