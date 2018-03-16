@@ -21,24 +21,12 @@
     uint16_t _port;
 }
 
-NSString *JSONString(id obj) {
-    if (![NSJSONSerialization isValidJSONObject:obj]) {
-        return nil;
-    }
-    __autoreleasing NSError *error = nil;
-    NSData *result = [NSJSONSerialization dataWithJSONObject:obj options:kNilOptions error:&error];
-    if (error) {
-        return nil;
-    }
-    return [[NSString alloc] initWithData:result encoding:NSUTF8StringEncoding];
-}
-
 - (void)viewDidLoad {
     [super viewDidLoad];
     // Do any additional setup after loading the view, typically from a nib.
     
-    _host = @"192.168.1.132";
-    _port = 9011;
+    _host = @"localhost";
+    _port = 8080;
     
     
     DDTCPClient *socket = [[DDTCPClient alloc] init];
