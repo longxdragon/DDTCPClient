@@ -59,6 +59,8 @@
     
     // Add network monitoring
     [self _startMonitoring];
+    
+    [self _resetConnect];
 }
 
 - (void)disConnect {
@@ -104,7 +106,6 @@
             [self.delegate client:self didConnect:host port:port];
         }
         [self _delaySendHeart];
-        [self _resetConnect];
     };
     
     if ([NSThread isMainThread]) {
