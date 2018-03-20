@@ -29,6 +29,7 @@
 @property (nonatomic, assign) NSTimeInterval reconnectTimeInterval;
 @property (nonatomic, assign) NSInteger reconnectCount;
 @property (nonatomic, assign) BOOL isDebug;
+@property (nonatomic, assign, readonly) BOOL networkReachable;
 
 - (void)connectHost:(NSString *)host port:(uint16_t)port;
 - (void)disConnect;
