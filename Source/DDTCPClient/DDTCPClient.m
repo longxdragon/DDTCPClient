@@ -81,10 +81,6 @@
     return [self.socket isConnected];
 }
 
-- (BOOL)networkReachable {
-    return _networkReachable;
-}
-
 #pragma mark - DDAsyncSocketDelegate
 
 - (void)socket:(DDAsyncSocket *)socket didReadData:(NSData *)data {
