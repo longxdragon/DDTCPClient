@@ -162,13 +162,17 @@
         if (!sself) {
             return;
         }
-        sself.networkReachable = reachability.isReachable;
+        sself.networkReachable = YES;
         // Reconnect
-        if (reachability.isReachable) {
-            [sself _reconnect];
-        }
+        [sself _reconnect];
     };
-    
+    self.reach.unreachableBlock = ^(Reachability *reachability) {
+        __strong typeof(self) sself = wself;
+        if (!sself) {
+            return;
+        }
+        sself.networkReachable = NO;
+    };
     
     [self.reach startNotifier];
 }
