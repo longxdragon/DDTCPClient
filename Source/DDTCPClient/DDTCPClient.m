@@ -81,6 +81,10 @@
     return [self.socket isConnected];
 }
 
+- (BOOL)isDisconnected {
+    return [self.socket isDisconnected];
+}
+
 #pragma mark - DDAsyncSocketDelegate
 
 - (void)socket:(DDAsyncSocket *)socket didReadData:(NSData *)data {
@@ -190,6 +194,20 @@
         if (self.isDebug) {
             NSLog(@"DDAsyncSocket -- <%p> host: %@ port: %d send heart", self.socket, self.socket.socketHost, self.socket.socketPort);
         }
+        // Send heart
+        void (^callback)(void) = ^(void) {
+            if (self.delegate && [self.delegate respondsToSelector:@selector(client:didSendHeartData:)]) {
+                [self.delegate client:self didSendHeartData:_heartData];
+            }
+        };
+        if ([NSThread isMainThread]) {
+            callback();
+        } else {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                callback();
+            });
+        }
+        
         [self _delaySendHeart];
     }
 }

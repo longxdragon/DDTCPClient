@@ -15,6 +15,7 @@
 - (void)client:(DDTCPClient *)client didReadData:(NSData *)data;
 - (void)client:(DDTCPClient *)client didConnect:(NSString *)host port:(uint16_t)port;
 - (void)clientDidDisconnect:(DDTCPClient *)client;
+- (void)client:(DDTCPClient *)client didSendHeartData:(NSData *)data;
 @end
 
 /**
@@ -34,5 +35,6 @@
 - (void)disConnect;
 - (void)sendData:(NSData *)data;
 - (BOOL)isConnected;
+- (BOOL)isDisconnected;
 
 @end
