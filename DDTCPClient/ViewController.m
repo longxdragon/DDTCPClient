@@ -32,7 +32,7 @@
     DDTCPClient *socket = [[DDTCPClient alloc] init];
     socket.delegate = self;
     socket.isDebug = YES;
-    socket.reconnectCount = 5;
+    socket.reconnectCount = -1;
     socket.reconnectTimeInterval = 5;
     _socket = socket;
     

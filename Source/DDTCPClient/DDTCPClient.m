@@ -59,8 +59,6 @@
     
     // Add network monitoring
     [self _startMonitoring];
-    
-    [self _resetConnect];
 }
 
 - (void)disConnect {
@@ -110,6 +108,8 @@
             [self.delegate client:self didConnect:host port:port];
         }
         [self _delaySendHeart];
+        
+        [self _resetConnect];
     };
     
     if ([NSThread isMainThread]) {
@@ -129,8 +129,8 @@
         [self _cancelSendHeart];
         
         if (self.needReconnect) {
-            // Reconnect immediatly
-            [self _reconnect];
+            // Reconnect delay
+            [self _delayReconnect];
         }
     };
     
@@ -168,6 +168,7 @@
         }
         sself.networkReachable = YES;
         // Reconnect
+        [sself _cancelReconnect];
         [sself _reconnect];
     };
     self.reach.unreachableBlock = ^(Reachability *reachability) {
@@ -197,7 +198,7 @@
         // Send heart
         void (^callback)(void) = ^(void) {
             if (self.delegate && [self.delegate respondsToSelector:@selector(client:didSendHeartData:)]) {
-                [self.delegate client:self didSendHeartData:_heartData];
+                [self.delegate client:self didSendHeartData:self->_heartData];
             }
         };
         if ([NSThread isMainThread]) {
@@ -238,16 +239,15 @@
     if (![self.socket isDisconnected]) {
         return;
     }
-    if (_reconnectFlag >= self.reconnectCount) {
+    if (self.reconnectCount >= 0 && _reconnectFlag >= self.reconnectCount) {
         return;
     }
     _reconnectFlag ++;
     
     if (self.isDebug) {
-        NSLog(@"DDAsyncSocket -- <%p> host: %@ port: %d reconnect count %zd", self.socket, self.socket.socketHost, self.socket.socketPort, _reconnectFlag);
+        NSLog(@"DDAsyncSocket -- <%p> host: %@ port: %d reconnect count %ld", self.socket, self.socket.socketHost, self.socket.socketPort, (long)_reconnectFlag);
     }
     [self.socket reconnect];
-    [self _delayReconnect];
 }
 
 - (void)_delayReconnect {
