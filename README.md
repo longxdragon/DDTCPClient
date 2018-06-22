@@ -33,6 +33,16 @@ DDTCPClient is a high level socket util based on [CocoaAsyncSocket](https://gith
 DDTCPClient *socket = [[DDTCPClient alloc] init];
 socket.delegate = self;
 ```
+### Property
+```objc
+// debug log open
+socket.isDebug = YES;
+// default is 10, set -1 when reconnect forever
+socket.reconnectCount = -1;
+// reconnect timeInterval
+socket.reconnectTimeInterval = 5;
+```
+
 ### Connect and disconnect
 
 ```objc
@@ -56,6 +66,19 @@ NSString *heartStr = @"I'm heart informations";
 NSData *heartData = [heartStr dataUsingEncoding:NSUTF8StringEncoding];
     
 [socket setHeartData:heartData];
+```
+### Delegate
+```objc
+- (void)client:(DDTCPClient *)client didReadData:(NSData *)data {
+    NSString *str = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+    NSLog(@"DDAsyncSocket -- %@", str);
+}
+- (void)client:(DDTCPClient *)client didConnect:(NSString *)host port:(uint16_t)port {
+
+}
+- (void)clientDidDisconnect:(DDTCPClient *)client {
+
+}
 ```
 
 Requirements
