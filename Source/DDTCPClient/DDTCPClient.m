@@ -8,13 +8,13 @@
 
 #import "DDTCPClient.h"
 #import "DDAsyncSocket.h"
-#import <Reachability/Reachability.h>
+#import "AFNetworkReachabilityManager.h"
 
 @interface DDTCPClient () <DDAsyncSocketDelegate>
 @property (nonatomic, strong) DDAsyncSocket *socket;
 @property (nonatomic, assign) NSInteger reconnectFlag;
 @property (nonatomic, assign) BOOL needReconnect;
-@property (nonatomic, strong) Reachability *reach;
+@property (nonatomic, strong) AFNetworkReachabilityManager *reach;
 @property (nonatomic, assign) BOOL networkReachable;
 @end
 
@@ -157,33 +157,30 @@
 - (void)_startMonitoring {
     [self _stopMonitoring];
     
-    self.reach = [Reachability reachabilityWithHostname:self.socket.socketHost];
+    self.reach = [AFNetworkReachabilityManager managerForDomain:self.socket.socketHost];
     self.networkReachable = self.reach.isReachable;
     
     __weak typeof(self) wself = self;
-    self.reach.reachableBlock = ^(Reachability *reachability) {
+    [self.reach setReachabilityStatusChangeBlock:^(AFNetworkReachabilityStatus status) {
         __strong typeof(self) sself = wself;
         if (!sself) {
             return;
         }
-        sself.networkReachable = YES;
-        // Reconnect
-        [sself _cancelReconnect];
-        [sself _reconnect];
-    };
-    self.reach.unreachableBlock = ^(Reachability *reachability) {
-        __strong typeof(self) sself = wself;
-        if (!sself) {
-            return;
+        if (status == AFNetworkReachabilityStatusReachableViaWWAN || status == AFNetworkReachabilityStatusReachableViaWiFi) {
+            sself.networkReachable = YES;
+            // Reconnect
+            [sself _cancelReconnect];
+            [sself _reconnect];
+        }else {
+            sself.networkReachable = NO;
         }
-        sself.networkReachable = NO;
-    };
+    }];
     
-    [self.reach startNotifier];
+    [self.reach startMonitoring];
 }
 
 - (void)_stopMonitoring {
-    [self.reach stopNotifier];
+    [self.reach stopMonitoring];
     [self setReach:nil];
 }
 
