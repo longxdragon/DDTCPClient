@@ -25,8 +25,8 @@
     [super viewDidLoad];
     // Do any additional setup after loading the view, typically from a nib.
     
-    _host = @"117.50.11.95";
-    _port = 1235;
+    _host = @"localhost";
+    _port = 8080;
     
     
     DDTCPClient *socket = [[DDTCPClient alloc] init];
