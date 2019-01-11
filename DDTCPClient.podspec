@@ -2,7 +2,7 @@
 Pod::Spec.new do |s|
 
   s.name         = "DDTCPClient"
-  s.version      = "0.0.1"
+  s.version      = "0.0.3"
   s.summary      = "A client of socket"
 
   s.homepage     = "https://github.com/longxdragon/DDTCPClient"
@@ -18,7 +18,7 @@ Pod::Spec.new do |s|
   s.requires_arc = true
 
   s.dependency 'CocoaAsyncSocket', '~> 7.6.2'
-  s.dependency  'AFNetworking/Reachability', '2.6.3'
+  s.dependency 'AFNetworking/Reachability', '2.6.3'
 
   # s.static_framework = true
 
