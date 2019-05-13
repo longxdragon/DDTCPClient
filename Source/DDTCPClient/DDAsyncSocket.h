@@ -25,6 +25,7 @@
 @property (nonatomic, assign, readonly) uint16_t socketPort;
 @property (nonatomic, assign) BOOL isDebug;
 
+- (instancetype)initWithSocketQueue:(dispatch_queue_t)socketQueue delegateQueue:(dispatch_queue_t)delegateQueue;
 - (void)connectHost:(NSString *)host port:(uint16_t)port;
 - (void)reconnect;
 - (void)disConnect;

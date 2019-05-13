@@ -11,19 +11,40 @@
 #import "AFNetworkReachabilityManager.h"
 
 @interface DDTCPClient () <DDAsyncSocketDelegate>
+
 @property (nonatomic, strong) DDAsyncSocket *socket;
+@property (nonatomic) dispatch_queue_t socketQueue;
+@property (nonatomic) dispatch_queue_t receiveQueue;
+@property (nonatomic) dispatch_queue_t defaultSocketQueue;
+@property (nonatomic) dispatch_queue_t defaultReceiveQueue;
 @property (nonatomic, assign) NSInteger reconnectFlag;
 @property (nonatomic, assign) BOOL needReconnect;
 @property (nonatomic, strong) AFNetworkReachabilityManager *reach;
 @property (nonatomic, assign) BOOL networkReachable;
+
 @end
 
 @implementation DDTCPClient
 
 - (instancetype)init {
-    self = [super init];
-    if (self) {
-        self.socket = [[DDAsyncSocket alloc] init];
+    return [self initWithSocketQueue:nil delegateQueue:nil];
+}
+
+- (instancetype)initWithSocketQueue:(dispatch_queue_t)socketQueue delegateQueue:(dispatch_queue_t)delegateQueue {
+    if (self = [super init]) {
+        // The socket queue can't be concurrent queue
+        if (socketQueue == dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW, 0) ||
+            socketQueue == dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0) ||
+            socketQueue == dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0)) {
+            socketQueue = nil;
+        }
+        
+        self.defaultSocketQueue = dispatch_queue_create("com.dd.socket", DISPATCH_QUEUE_SERIAL);
+        self.defaultReceiveQueue = dispatch_queue_create("com.dd.receive", DISPATCH_QUEUE_SERIAL);
+        self.socketQueue = socketQueue;
+        self.receiveQueue = delegateQueue;
+        
+        self.socket = [[DDAsyncSocket alloc] initWithSocketQueue:self.socketQueue ?: self.defaultSocketQueue delegateQueue:self.receiveQueue ?: self.defaultReceiveQueue];
         self.socket.delegate = self;
         
         self.heartTimeInterval = 10;
@@ -45,6 +66,8 @@
 }
 
 - (void)setHeartData:(NSData *)heartData {
+    NSAssert([NSThread isMainThread], @"Must operation at main thread");
+    
     if ([_heartData isEqualToData:heartData]) {
         return;
     }
@@ -55,6 +78,8 @@
 }
 
 - (void)connectHost:(NSString *)host port:(uint16_t)port {
+    NSAssert([NSThread isMainThread], @"Must operation at main thread");
+    
     [self.socket connectHost:host port:port];
     
     // Add network monitoring
@@ -62,6 +87,8 @@
 }
 
 - (void)disConnect {
+    NSAssert([NSThread isMainThread], @"Must operation at main thread");
+    
     // Custom disconnect, so do not need reconnect
     _needReconnect = NO;
     
@@ -72,6 +99,8 @@
 }
 
 - (void)sendData:(NSData *)data {
+    NSAssert([NSThread isMainThread], @"Must operation at main thread");
+    
     [self _sendData:data];
 }
 
@@ -92,14 +121,7 @@
         }
         [self _delaySendHeart];
     };
-    
-    if ([NSThread isMainThread]) {
-        callback();
-    } else {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            callback();
-        });
-    }
+    dispatch_async(self.receiveQueue ?: dispatch_get_main_queue(), callback);
 }
 
 - (void)socket:(DDAsyncSocket *)socket didConnect:(NSString *)host port:(uint16_t)port {
@@ -111,14 +133,7 @@
         
         [self _resetConnect];
     };
-    
-    if ([NSThread isMainThread]) {
-        callback();
-    } else {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            callback();
-        });
-    }
+    dispatch_async(self.receiveQueue ?: dispatch_get_main_queue(), callback);
 }
 
 - (void)socketDidDisconnect:(DDAsyncSocket *)socket {
@@ -133,14 +148,7 @@
             [self _delayReconnect];
         }
     };
-    
-    if ([NSThread isMainThread]) {
-        callback();
-    } else {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            callback();
-        });
-    }
+    dispatch_async(self.receiveQueue ?: dispatch_get_main_queue(), callback);
 }
 
 #pragma mark - Private
@@ -198,13 +206,7 @@
                 [self.delegate client:self didSendHeartData:self->_heartData];
             }
         };
-        if ([NSThread isMainThread]) {
-            callback();
-        } else {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                callback();
-            });
-        }
+        dispatch_async(self.receiveQueue ?: dispatch_get_main_queue(), callback);
         
         [self _delaySendHeart];
     }

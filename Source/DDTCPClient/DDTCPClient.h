@@ -31,6 +31,7 @@
 @property (nonatomic, assign) NSInteger reconnectCount;
 @property (nonatomic, assign) BOOL isDebug;
 
+- (instancetype)initWithSocketQueue:(dispatch_queue_t)socketQueue delegateQueue:(dispatch_queue_t)delegateQueue;
 - (void)connectHost:(NSString *)host port:(uint16_t)port;
 - (void)disConnect;
 - (void)sendData:(NSData *)data;

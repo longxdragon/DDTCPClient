@@ -10,6 +10,7 @@
 #import <CocoaAsyncSocket/GCDAsyncSocket.h>
 
 @interface DDAsyncSocket () <GCDAsyncSocketDelegate>
+
 @property (nonatomic) GCDAsyncSocket *socket;
 @property (nonatomic) dispatch_queue_t socketQueue;
 @property (nonatomic) dispatch_queue_t receiveQueue;
@@ -17,6 +18,7 @@
 @property (nonatomic, assign) UInt16 port;
 @property (nonatomic, strong) NSMutableData *buffer;
 @property (nonatomic, assign) BOOL isReading;
+
 @end
 
 @implementation DDAsyncSocket
@@ -24,11 +26,10 @@
 static NSTimeInterval DDSocketTimeout = -1;
 static NSInteger DDSocketTag = 0;
 
-- (instancetype)init {
-    self = [super init];
-    if (self) {
-        self.socketQueue = dispatch_queue_create("com.dd.socket", DISPATCH_QUEUE_SERIAL);
-        self.receiveQueue = dispatch_queue_create("com.dd.receive", DISPATCH_QUEUE_SERIAL);
+- (instancetype)initWithSocketQueue:(dispatch_queue_t)socketQueue delegateQueue:(dispatch_queue_t)delegateQueue {
+    if (self = [super init]) {
+        self.socketQueue = socketQueue;
+        self.receiveQueue = delegateQueue;
         
         self.socket = [[GCDAsyncSocket alloc] initWithDelegate:self delegateQueue:self.receiveQueue socketQueue:self.socketQueue];
         self.socket.IPv4Enabled = YES;
@@ -70,7 +71,7 @@ static NSInteger DDSocketTag = 0;
     [self.socket disconnect];
 }
 
-// Handle on receiveQueue (Serial queue), so nolock.
+// Handle on socketQueue (Serial queue), so nolock.
 - (void)_didReceiveData:(NSData *)data {
     [_buffer appendData:data];
     
@@ -106,16 +107,14 @@ static NSInteger DDSocketTag = 0;
     }
 }
 
+// Run in socketQueue
 - (void)_didReadData {
-    // Run in receiveQueue
     if (self.isReading) {
         return;
     }
     self.isReading = YES;
     
-    dispatch_async(self.socketQueue, ^{
-        [self.socket readDataWithTimeout:DDSocketTimeout tag:DDSocketTag];
-    });
+    [self.socket readDataWithTimeout:DDSocketTimeout tag:DDSocketTag];
 }
 
 - (void)_didSendData:(NSData *)data {
@@ -128,7 +127,7 @@ static NSInteger DDSocketTag = 0;
 }
 
 - (void)_callback:(NSData *)data {
-    dispatch_async(dispatch_get_main_queue(), ^{
+    dispatch_async(self.receiveQueue, ^{
         if (self.delegate && [self.delegate respondsToSelector:@selector(socket:didReadData:)]) {
             [self.delegate socket:self didReadData:data];
         }
@@ -138,10 +137,10 @@ static NSInteger DDSocketTag = 0;
 #pragma mark - Public
 
 - (void)connectHost:(NSString *)host port:(uint16_t)port {
-    self.host = host;
-    self.port = port;
-    
     dispatch_async(self.socketQueue, ^{
+        self.host = host;
+        self.port = port;
+        
         [self _connect];
     });
 }
@@ -203,42 +202,44 @@ static NSInteger DDSocketTag = 0;
         NSLog(@"DDAsyncSocket -- <%p> host: %@ port: %d connect successed", self, self.host, self.port);
     }
     // Reset default value
-    self.buffer.length = 0;
-    self.isReading = NO;
-    
-    dispatch_async(dispatch_get_main_queue(), ^{
-        if (self.delegate && [self.delegate respondsToSelector:@selector(socket:didConnect:port:)]) {
-            [self.delegate socket:self didConnect:host port:port];
-        }
+    dispatch_async(self.socketQueue, ^{
+        self.buffer.length = 0;
+        self.isReading = NO;
     });
+    
+    if (self.delegate && [self.delegate respondsToSelector:@selector(socket:didConnect:port:)]) {
+        [self.delegate socket:self didConnect:host port:port];
+    }
 }
 
 - (void)socketDidDisconnect:(GCDAsyncSocket *)sock withError:(NSError *)err {
     if (self.isDebug) {
         NSLog(@"DDAsyncSocket -- <%p> host: %@ port: %d disConnect error: %@", self, self.host, self.port, err);
     }
-    dispatch_async(dispatch_get_main_queue(), ^{
-        if (self.delegate && [self.delegate respondsToSelector:@selector(socketDidDisconnect:)]) {
-            [self.delegate socketDidDisconnect:self];
-        }
-    });
+    if (self.delegate && [self.delegate respondsToSelector:@selector(socketDidDisconnect:)]) {
+        [self.delegate socketDidDisconnect:self];
+    }
 }
 
 - (void)socket:(GCDAsyncSocket *)sock didWriteDataWithTag:(long)tag {
     if (self.isDebug) {
         NSLog(@"DDAsyncSocket -- <%p> host: %@ port: %d did write", self, self.host, self.port);
     }
-    [self _didReadData];
+    dispatch_async(self.socketQueue, ^{
+        [self _didReadData];
+    });
 }
 
 - (void)socket:(GCDAsyncSocket *)sock didReadData:(NSData *)data withTag:(long)tag {
     if (self.isDebug) {
         NSLog(@"DDAsyncSocket -- <%p> host: %@ port: %d did receive data", self, self.host, self.port);
     }
-    self.isReading = NO;
-    
-    [self _didReceiveData:data];
-    [self _didReadData];
+    dispatch_async(self.socketQueue, ^{
+        self.isReading = NO;
+        
+        [self _didReceiveData:data];
+        [self _didReadData];
+    });
 }
 
 @end
