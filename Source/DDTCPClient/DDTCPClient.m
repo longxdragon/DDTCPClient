@@ -7,183 +7,113 @@
 //
 
 #import "DDTCPClient.h"
-#import "DDAsyncSocket.h"
 #import "AFNetworkReachabilityManager.h"
 
-@interface DDTCPClient () <DDAsyncSocketDelegate>
+#import <CocoaAsyncSocket/GCDAsyncSocket.h>
 
-@property (nonatomic, strong) DDAsyncSocket *socket;
+@interface DDTCPClient () <GCDAsyncSocketDelegate>
+
+@property (nonatomic, strong) AFNetworkReachabilityManager *reach;
+@property (nonatomic) GCDAsyncSocket *socket;
 @property (nonatomic) dispatch_queue_t socketQueue;
 @property (nonatomic) dispatch_queue_t receiveQueue;
-@property (nonatomic) dispatch_queue_t defaultSocketQueue;
-@property (nonatomic) dispatch_queue_t defaultReceiveQueue;
+
+// Edit in socket queue
+@property (nonatomic, strong) NSData *heart;
 @property (nonatomic, assign) NSInteger reconnectFlag;
 @property (nonatomic, assign) BOOL needReconnect;
-@property (nonatomic, strong) AFNetworkReachabilityManager *reach;
 @property (nonatomic, assign) BOOL networkReachable;
+
+@property (nonatomic, copy) NSString *host;
+@property (nonatomic, assign) UInt16 port;
+
+// Edit in receive queue
+@property (nonatomic, strong) NSMutableData *buffer;
+@property (nonatomic, assign) BOOL isReading;
 
 @end
 
-@implementation DDTCPClient
+static NSTimeInterval DDSocketTimeout = -1;
+static NSInteger DDSocketTag = 0;
 
-- (instancetype)init {
-    return [self initWithSocketQueue:nil delegateQueue:nil];
+@implementation DDTCPClient {
+    void *IsOnSocketQueueOrTargetQueueKey;
+    dispatch_source_t _heartTimer;
+    dispatch_source_t _reconnectTimer;
 }
 
-- (instancetype)initWithSocketQueue:(dispatch_queue_t)socketQueue delegateQueue:(dispatch_queue_t)delegateQueue {
-    if (self = [super init]) {
-        // The socket queue can't be concurrent queue
-        if (socketQueue == dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW, 0) ||
-            socketQueue == dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0) ||
-            socketQueue == dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0)) {
-            socketQueue = nil;
-        }
+- (instancetype)init {
+    return [self initWithReceiveQueue:nil];
+}
+
+- (instancetype)initWithReceiveQueue:(dispatch_queue_t)queue {
+    self = [super init];
+    if (self) {
+        self.socketQueue = dispatch_queue_create("com.dd.socket", DISPATCH_QUEUE_SERIAL);
+        self.receiveQueue = queue ? queue : dispatch_get_main_queue();
         
-        self.defaultSocketQueue = dispatch_queue_create("com.dd.socket", DISPATCH_QUEUE_SERIAL);
-        self.defaultReceiveQueue = dispatch_queue_create("com.dd.receive", DISPATCH_QUEUE_SERIAL);
-        self.socketQueue = socketQueue;
-        self.receiveQueue = delegateQueue;
+        NSAssert(self.receiveQueue != dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW, 0),
+                 @"The given receiveQueue parameter must not be a concurrent queue.");
+        NSAssert(self.receiveQueue != dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0),
+                 @"The given receiveQueue parameter must not be a concurrent queue.");
+        NSAssert(self.receiveQueue != dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0),
+                 @"The given receiveQueue parameter must not be a concurrent queue.");
         
-        self.socket = [[DDAsyncSocket alloc] initWithSocketQueue:self.socketQueue ?: self.defaultSocketQueue delegateQueue:self.receiveQueue ?: self.defaultReceiveQueue];
-        self.socket.delegate = self;
+        self.socket = [[GCDAsyncSocket alloc] initWithDelegate:self delegateQueue:self.receiveQueue socketQueue:self.socketQueue];
+        self.socket.IPv4Enabled = YES;
+        self.socket.IPv6Enabled = YES;
+        self.socket.IPv4PreferredOverIPv6 = NO;
+        
+        self.buffer = [NSMutableData data];
+        self.buffer.length = 0;
+        self.isReading = NO;
+        
+        IsOnSocketQueueOrTargetQueueKey = &IsOnSocketQueueOrTargetQueueKey;
+        void *nonNullUnusedPointer = (__bridge void *)self;
+        dispatch_queue_set_specific(self.socketQueue, IsOnSocketQueueOrTargetQueueKey, nonNullUnusedPointer, NULL);
         
         self.heartTimeInterval = 10;
         self.reconnectTimeInterval = 10;
         self.reconnectCount = 10;
         self.reconnectFlag = 0;
         self.isDebug = NO;
+        
         self.networkReachable = YES;
         self.needReconnect = YES;
     }
     return self;
 }
 
-#pragma mark - Public
-
-- (void)setIsDebug:(BOOL)isDebug {
-    _isDebug = isDebug;
-    self.socket.isDebug = isDebug;
-}
-
-- (void)setHeartData:(NSData *)heartData {
-    NSAssert([NSThread isMainThread], @"Must operation at main thread");
-    
-    if ([_heartData isEqualToData:heartData]) {
-        return;
-    }
-    _heartData = heartData;
-    
-    // Send heart
-    [self _sendHeart];
-}
-
-- (void)connectHost:(NSString *)host port:(uint16_t)port {
-    NSAssert([NSThread isMainThread], @"Must operation at main thread");
-    
-    [self.socket connectHost:host port:port];
-    
-    // Add network monitoring
-    [self _startMonitoring];
-}
-
-- (void)disConnect {
-    NSAssert([NSThread isMainThread], @"Must operation at main thread");
-    
-    // Custom disconnect, so do not need reconnect
-    _needReconnect = NO;
-    
-    [self.socket disConnect];
-    
-    // Remove network monitoring
-    [self _stopMonitoring];
-}
-
-- (void)sendData:(NSData *)data {
-    NSAssert([NSThread isMainThread], @"Must operation at main thread");
-    
-    [self _sendData:data];
-}
-
-- (BOOL)isConnected {
-    return [self.socket isConnected];
-}
-
-- (BOOL)isDisconnected {
-    return [self.socket isDisconnected];
-}
-
-#pragma mark - DDAsyncSocketDelegate
-
-- (void)socket:(DDAsyncSocket *)socket didReadData:(NSData *)data {
-    void (^callback)(void) = ^(void) {
-        if (self.delegate && [self.delegate respondsToSelector:@selector(client:didReadData:)]) {
-            [self.delegate client:self didReadData:data];
-        }
-        [self _delaySendHeart];
-    };
-    dispatch_async(self.receiveQueue ?: dispatch_get_main_queue(), callback);
-}
-
-- (void)socket:(DDAsyncSocket *)socket didConnect:(NSString *)host port:(uint16_t)port {
-    void (^callback)(void) = ^(void) {
-        if (self.delegate && [self.delegate respondsToSelector:@selector(client:didConnect:port:)]) {
-            [self.delegate client:self didConnect:host port:port];
-        }
-        [self _delaySendHeart];
-        
-        [self _resetConnect];
-    };
-    dispatch_async(self.receiveQueue ?: dispatch_get_main_queue(), callback);
-}
-
-- (void)socketDidDisconnect:(DDAsyncSocket *)socket {
-    void (^callback)(void) = ^(void) {
-        if (self.delegate && [self.delegate respondsToSelector:@selector(clientDidDisconnect:)]) {
-            [self.delegate clientDidDisconnect:self];
-        }
-        [self _cancelSendHeart];
-        
-        if (self.needReconnect) {
-            // Reconnect delay
-            [self _delayReconnect];
-        }
-    };
-    dispatch_async(self.receiveQueue ?: dispatch_get_main_queue(), callback);
-}
-
-#pragma mark - Private
-
-// Cannot send data when the socket is not connected
-- (BOOL)_sendData:(NSData *)data {
-    if (!data || ![self isConnected]) {
-        return NO;
-    }
-    [self.socket sendData:data];
-    return YES;
-}
+#pragma mark - Network Monitoring
 
 - (void)_startMonitoring {
     [self _stopMonitoring];
     
-    self.reach = [AFNetworkReachabilityManager managerForDomain:self.socket.socketHost];
+    self.reach = [AFNetworkReachabilityManager managerForDomain:self.host];
     self.networkReachable = self.reach.isReachable;
     
     __weak typeof(self) wself = self;
     [self.reach setReachabilityStatusChangeBlock:^(AFNetworkReachabilityStatus status) {
         __strong typeof(self) sself = wself;
-        if (!sself) {
-            return;
-        }
-        if (status == AFNetworkReachabilityStatusReachableViaWWAN || status == AFNetworkReachabilityStatusReachableViaWiFi) {
-            sself.networkReachable = YES;
-            // Reconnect
-            [sself _cancelReconnect];
-            [sself _reconnect];
-        }else {
-            sself.networkReachable = NO;
-        }
+        if (!sself) return;
+        // Run in main thread, need change to socket queue
+        void (^block)(void) = ^(void) {
+            if (status == AFNetworkReachabilityStatusReachableViaWWAN ||
+                status == AFNetworkReachabilityStatusReachableViaWiFi) {
+                sself.networkReachable = YES;
+                
+                // Reconnect
+                if ([sself isDisconnected] && [self _checkNeedReconnectTimer]) {
+                    [sself _connect];
+                    [sself _resetConnect];
+                    [sself _startReconnectTimer];
+                }
+            } else {
+                sself.networkReachable = NO;
+            }
+        };
+        dispatch_async(sself.socketQueue, block);
     }];
-    
     [self.reach startMonitoring];
 }
 
@@ -195,47 +125,60 @@
 #pragma mark - Send Heart
 
 - (void)_sendHeart {
-    BOOL success = [self _sendData:_heartData];
+    BOOL success = [self sendData:self.heart];
     if (success) {
         if (self.isDebug) {
-            NSLog(@"DDAsyncSocket -- <%p> host: %@ port: %d send heart", self.socket, self.socket.socketHost, self.socket.socketPort);
+            NSLog(@"%@ -- <%p> host: %@ port: %d send heart", NSStringFromClass([self class]), self, self.host, self.port);
         }
         // Send heart
-        void (^callback)(void) = ^(void) {
+        NSData *copyData = [self.heart copy];
+        dispatch_async(self.receiveQueue, ^{
             if (self.delegate && [self.delegate respondsToSelector:@selector(client:didSendHeartData:)]) {
-                [self.delegate client:self didSendHeartData:self->_heartData];
+                [self.delegate client:self didSendHeartData:copyData];
             }
-        };
-        dispatch_async(self.receiveQueue ?: dispatch_get_main_queue(), callback);
-        
-        [self _delaySendHeart];
+        });
     }
 }
 
-- (void)_delaySendHeart {
-    [self _cancelSendHeart];
-    [self performSelector:@selector(_sendHeart) withObject:nil afterDelay:self.heartTimeInterval];
+- (void)_startHeartTimer {
+    [self _stopHeartTimer];
+    
+    if (self.heartTimeInterval > 0) {
+        // Thread start timer needs to be specified
+        // No matter which thread the current method is executed in, the call of timer will call back in the specified thread
+        dispatch_source_t timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, self.socketQueue);
+        dispatch_source_set_timer(timer, dispatch_time(DISPATCH_TIME_NOW, self.heartTimeInterval * NSEC_PER_SEC), self.heartTimeInterval * NSEC_PER_SEC, self.heartTimeInterval * NSEC_PER_SEC);
+        dispatch_source_set_event_handler(timer, ^{
+            [self _sendHeart];
+        });
+        dispatch_resume(timer);
+        _heartTimer = timer;
+    }
 }
 
-- (void)_cancelSendHeart {
-    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(_sendHeart) object:nil];
+- (void)_stopHeartTimer {
+    if (_heartTimer) {
+        dispatch_source_cancel(_heartTimer);
+        _heartTimer = nil;
+    }
 }
 
-#pragma mark - Reconnect
+#pragma mark - Reconnect Actions
 
 - (void)_resetConnect {
     _reconnectFlag = 0;
-    _needReconnect = YES;
-    
-    [self _cancelReconnect];
+}
+
+- (void)_resetConnectState:(BOOL)state {
+    _needReconnect = state;
+}
+
+- (BOOL)_checkNeedReconnectTimer {
+    return (_needReconnect = YES && _reconnectTimer == nil);
 }
 
 - (void)_reconnect {
     if (!self.networkReachable) {
-        return;
-    }
-    // Cannot connect when connecting or connected
-    if (![self.socket isDisconnected]) {
         return;
     }
     if (self.reconnectCount >= 0 && _reconnectFlag >= self.reconnectCount) {
@@ -244,18 +187,313 @@
     _reconnectFlag ++;
     
     if (self.isDebug) {
-        NSLog(@"DDAsyncSocket -- <%p> host: %@ port: %d reconnect count %ld", self.socket, self.socket.socketHost, self.socket.socketPort, (long)_reconnectFlag);
+        NSLog(@"%@ -- <%p> host: %@ port: %d reconnect count %ld", NSStringFromClass([self class]), self.socket, self.host, self.port, (long)_reconnectFlag);
     }
-    [self.socket reconnect];
+    
+    [self _connect];
 }
 
-- (void)_delayReconnect {
-    [self _cancelReconnect];
-    [self performSelector:@selector(_reconnect) withObject:nil afterDelay:self.reconnectTimeInterval];
+- (void)_startReconnectTimer {
+    [self _stopReconnectTimer];
+    
+    if (self.reconnectTimeInterval > 0) {
+        // Thread start timer needs to be specified
+        // No matter which thread the current method is executed in, the call of timer will call back in the specified thread
+        dispatch_source_t timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, self.socketQueue);
+        dispatch_source_set_timer(timer, DISPATCH_TIME_NOW, self.reconnectTimeInterval * NSEC_PER_SEC, 0);
+        dispatch_source_set_event_handler(timer, ^{
+            [self _reconnect];
+        });
+        dispatch_resume(timer);
+        _reconnectTimer = timer;
+    }
 }
 
-- (void)_cancelReconnect {
-    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(_reconnect) object:nil];
+- (void)_stopReconnectTimer {
+    if (_reconnectTimer) {
+        dispatch_source_cancel(_reconnectTimer);
+        _reconnectTimer = nil;
+    }
+}
+
+#pragma mark - Socket Connect & Disconnect
+
+- (void)_connect {
+    // Cannot connect when the socket is not connected (connecting or connected)
+    // Just connect when the socket is disconnected
+    // Cancel the after connect actions
+    if (![self isDisconnected]) {
+        if (self.isDebug) {
+            NSLog(@"%@ -- <%p> host: %@ port: %d connect error: already connecting or connected", NSStringFromClass([self class]), self, self.host, self.port);
+        }
+        return;
+    }
+    
+    if (self.isDebug) {
+        NSLog(@"%@ -- <%p> host: %@ port: %d connecting", NSStringFromClass([self class]), self, self.host, self.port);
+    }
+    
+    NSError *error;
+    [self.socket connectToHost:self.host onPort:self.port error:&error];
+    if (error) {
+        if (self.isDebug) {
+            NSLog(@"%@ -- <%p> host: %@ port: %d connect error: %@", NSStringFromClass([self class]), self, self.host, self.port, error);
+        }
+    }
+}
+
+- (void)_disConnect {
+    [self.socket disconnect];
+}
+
+- (void)_didSendData:(NSData *)data {
+    if (self.socket.isDisconnected) {
+        [self _connect];
+    }
+    [self.socket writeData:data withTimeout:DDSocketTimeout tag:DDSocketTag];
+}
+
+// Handle on receiveQueue (Serial queue), so nolock.
+- (void)_didReceiveData:(NSData *)data {
+    [_buffer appendData:data];
+    
+    while (_buffer.length > 4) {
+        // Format first four byte to int
+        Byte *byte = (Byte *)_buffer.bytes;
+        int length = (int)((byte[3] & 0xFF) | ((byte[2] & 0xFF)<<8) | ((byte[1] & 0xFF)<<16) | ((byte[0] & 0xFF)<<24));
+        
+        if (length == 0) {
+            if (_buffer.length >= 4) {
+                NSData *tmp = [_buffer subdataWithRange:NSMakeRange(4, _buffer.length - 4)];
+                
+                [_buffer setLength:0];
+                [_buffer appendData:tmp];
+            } else {
+                [_buffer setLength:0];
+            }
+            [self _callback:nil];
+            
+        } else {
+            NSUInteger packageLength = 4 + length;
+            if (packageLength <= _buffer.length) {
+                NSData *data = [_buffer subdataWithRange:NSMakeRange(4, length)];
+                NSData *tmp = [_buffer subdataWithRange:NSMakeRange(packageLength, _buffer.length - packageLength)];
+                
+                [_buffer setLength:0];
+                [_buffer appendData:tmp];
+                [self _callback:data];
+            } else {
+                break;
+            }
+        }
+    }
+}
+
+- (void)_didReadData {
+    if (self.isReading) {
+        return;
+    }
+    self.isReading = YES;
+    
+    // Run in receiveQueue, change to socketQueue
+    dispatch_async(self.socketQueue, ^{
+        [self.socket readDataWithTimeout:DDSocketTimeout tag:DDSocketTag];
+    });
+}
+
+- (void)_callback:(NSData *)data {
+    if (self.delegate && [self.delegate respondsToSelector:@selector(client:didReadData:)]) {
+        [self.delegate client:self didReadData:data];
+    }
+}
+
+#pragma mark - Public
+
+- (void)connectHost:(NSString *)host port:(uint16_t)port {
+    void (^block)(void) = ^(void) {
+        self.host = host;
+        self.port = port;
+        
+        [self _resetConnectState:YES]; // Need reconnect
+        [self _connect];
+        [self _startMonitoring];  // start network monitoring when connect
+    };
+    if (dispatch_get_specific(IsOnSocketQueueOrTargetQueueKey)) {
+        block();
+    } else {
+        dispatch_async(self.socketQueue, block);
+    }
+}
+
+- (void)disConnect {
+    void (^block)(void) = ^(void) {
+        [self _resetConnectState:NO];
+        [self _stopReconnectTimer];
+        [self _disConnect];
+        [self _stopMonitoring];  // stop network monitoring when disconnect
+    };
+    if (dispatch_get_specific(IsOnSocketQueueOrTargetQueueKey)) {
+        block();
+    } else {
+        dispatch_async(self.socketQueue, block);
+    }
+}
+
+- (void)setHeartData:(NSData *)heartData {
+    NSData *copyData = [heartData copy];
+    
+    void (^block)(void) = ^(void) {
+        if ([self.heart isEqualToData:copyData]) return;
+        self.heart = copyData;
+        
+        if (copyData) {
+            [self _sendHeart];
+        }
+    };
+    if (dispatch_get_specific(IsOnSocketQueueOrTargetQueueKey)) {
+        block();
+    } else {
+        dispatch_async(self.socketQueue, block);
+    }
+}
+
+// Append package length in first 4 byte
+- (BOOL)sendData:(NSData *)data {
+    if (!data || ![self isConnected]) {
+        return NO;
+    }
+    
+    NSUInteger length = data.length;
+    NSData *copyData = [data copy]; // fix input mutable data
+    
+    void (^block)(void) = ^(void) {
+        // Format data length <int to data>
+        Byte byte[4];
+        byte[0] = (Byte)((length>>24) & 0xFF);
+        byte[1] = (Byte)((length>>16) & 0xFF);
+        byte[2] = (Byte)((length>>8) & 0xFF);
+        byte[3] = (Byte)(length & 0xFF);
+        NSData *lengthData = [NSData dataWithBytes:byte length:4];
+        
+        NSMutableData *mutableData = [NSMutableData data];
+        [mutableData appendData:lengthData];
+        [mutableData appendData:copyData];
+        
+        [self _didSendData:[mutableData copy]];
+    };
+    if (dispatch_get_specific(IsOnSocketQueueOrTargetQueueKey)) {
+        block();
+    } else {
+        dispatch_async(self.socketQueue, block);
+    }
+    return YES;
+}
+
+- (BOOL)isConnected {
+    return [self.socket isConnected]; // GCDAsyncSocket did the action in socket queue
+}
+
+- (BOOL)isDisconnected {
+    return [self.socket isDisconnected];
+}
+
+- (NSString *)socketHost {
+    __block NSString *host = nil;
+    void (^block)(void) = ^(void) {
+        host = [self.host copy];
+    };
+    if (dispatch_get_specific(IsOnSocketQueueOrTargetQueueKey)) {
+        block();
+    } else {
+        dispatch_sync(self.socketQueue, ^{
+            block();
+        });
+    }
+    return host;
+}
+
+- (uint16_t)socketPort {
+    __block uint16_t port = 0;
+    void (^block)(void) = ^(void) {
+        port = self.port;
+    };
+    if (dispatch_get_specific(IsOnSocketQueueOrTargetQueueKey)) {
+        block();
+    } else {
+        dispatch_sync(self.socketQueue, ^{
+            block();
+        });
+    }
+    return port;
+}
+
+- (NSData *)heartData {
+    __block NSData *copyData = nil;
+    void (^block)(void) = ^(void) {
+        copyData = self.heart;
+    };
+    if (dispatch_get_specific(IsOnSocketQueueOrTargetQueueKey)) {
+        block();
+    } else {
+        dispatch_sync(self.socketQueue, block);
+    }
+    return copyData;
+}
+
+#pragma mark - GCDAsyncSocketDelegate
+// All delegate methods run in receiveQueue
+
+- (void)socket:(GCDAsyncSocket *)sock didConnectToHost:(NSString *)host port:(uint16_t)port {
+    if (self.isDebug) {
+        NSLog(@"%@ -- <%p> host: %@ port: %d connect successed", NSStringFromClass([self class]), self, self.socketHost, self.socketPort);
+    }
+    // Reset default value
+    self.buffer.length = 0;
+    self.isReading = NO;
+    
+    if (self.delegate && [self.delegate respondsToSelector:@selector(client:didConnect:port:)]) {
+        [self.delegate client:self didConnect:host port:port];
+    }
+    
+    dispatch_async(self.socketQueue, ^{
+        [self _startHeartTimer];
+        [self _stopReconnectTimer];
+    });
+}
+
+- (void)socketDidDisconnect:(GCDAsyncSocket *)sock withError:(NSError *)err {
+    if (self.isDebug) {
+        NSLog(@"%@ -- <%p> host: %@ port: %d disConnect error: %@", NSStringFromClass([self class]), self, self.socketHost, self.socketPort, err);
+    }
+    if (self.delegate && [self.delegate respondsToSelector:@selector(clientDidDisconnect:)]) {
+        [self.delegate clientDidDisconnect:self];
+    }
+    
+    dispatch_async(self.socketQueue, ^{
+        [self _stopHeartTimer];
+        
+        if ([self _checkNeedReconnectTimer]) {
+            [self _resetConnect];
+            [self _startReconnectTimer];
+        }
+    });
+}
+
+- (void)socket:(GCDAsyncSocket *)sock didWriteDataWithTag:(long)tag {
+    if (self.isDebug) {
+        NSLog(@"%@ -- <%p> host: %@ port: %d did write", NSStringFromClass([self class]), self, self.socketHost, self.socketPort);
+    }
+    [self _didReadData];
+}
+
+- (void)socket:(GCDAsyncSocket *)sock didReadData:(NSData *)data withTag:(long)tag {
+    if (self.isDebug) {
+        NSLog(@"%@ -- <%p> host: %@ port: %d did receive data", NSStringFromClass([self class]), self, self.socketHost, self.socketPort);
+    }
+    self.isReading = NO;
+    
+    [self _didReceiveData:data];
+    [self _didReadData];
 }
 
 @end
