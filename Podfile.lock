@@ -1,20 +1,16 @@
 PODS:
-  - AFNetworking/Reachability (2.6.3)
   - CocoaAsyncSocket (7.6.2)
 
 DEPENDENCIES:
-  - AFNetworking/Reachability (~> 2.6.3)
   - CocoaAsyncSocket (~> 7.6.2)
 
 SPEC REPOS:
   https://github.com/CocoaPods/Specs.git:
-    - AFNetworking
     - CocoaAsyncSocket
 
 SPEC CHECKSUMS:
-  AFNetworking: cb8d14a848e831097108418f5d49217339d4eb60
   CocoaAsyncSocket: 3541e024f48c54b251638ef72d51dd42808de932
 
-PODFILE CHECKSUM: 45111bacf5c129a409515e5d615226265e98e3aa
+PODFILE CHECKSUM: f27b6a5021be6450b3254a1af64ab5d7f1240fa2
 
-COCOAPODS: 1.5.0
+COCOAPODS: 1.9.0

@@ -7,13 +7,33 @@
 //
 
 #import "DDTCPClient.h"
-#import "AFNetworkReachabilityManager.h"
-
 #import <CocoaAsyncSocket/GCDAsyncSocket.h>
+#import <SystemConfiguration/SystemConfiguration.h>
+
+typedef void (^DDNetworkReachabilityStatusBlock)(BOOL reachable);
+
+static void DDNetworkReachilityCallBack(SCNetworkReachabilityRef target, SCNetworkReachabilityFlags flags, void *info) {
+    DDNetworkReachabilityStatusBlock block = ((__bridge DDNetworkReachabilityStatusBlock)info);
+    if (block) {
+        block(((flags & kSCNetworkReachabilityFlagsReachable) != 0));
+    }
+}
+
+static const void *DDNetworkReachabilityRetainCallback(const void *info) {
+    return Block_copy(info);
+}
+
+static void DDNetworkReachabilityReleaseCallback(const void *info) {
+    if (info) {
+        Block_release(info);
+    }
+}
 
 @interface DDTCPClient () <GCDAsyncSocketDelegate>
 
-@property (nonatomic, strong) AFNetworkReachabilityManager *reach;
+@property (nonatomic, assign) SCNetworkReachabilityRef ref;
+
+
 @property (nonatomic) GCDAsyncSocket *socket;
 @property (nonatomic) dispatch_queue_t socketQueue;
 @property (nonatomic) dispatch_queue_t receiveQueue;
@@ -40,6 +60,11 @@ static NSInteger DDSocketTag = 0;
     void *IsOnSocketQueueOrTargetQueueKey;
     dispatch_source_t _heartTimer;
     dispatch_source_t _reconnectTimer;
+}
+
+- (void)dealloc {
+    SCNetworkReachabilitySetDispatchQueue(self.ref, NULL);
+    CFRelease(self.ref);
 }
 
 - (instancetype)init {
@@ -89,37 +114,34 @@ static NSInteger DDSocketTag = 0;
 - (void)_startMonitoring {
     [self _stopMonitoring];
     
-    self.reach = [AFNetworkReachabilityManager managerForDomain:self.host];
-    self.networkReachable = self.reach.isReachable;
-    
-    __weak typeof(self) wself = self;
-    [self.reach setReachabilityStatusChangeBlock:^(AFNetworkReachabilityStatus status) {
-        __strong typeof(self) sself = wself;
-        if (!sself) return;
-        // Run in main thread, need change to socket queue
-        void (^block)(void) = ^(void) {
-            if (status == AFNetworkReachabilityStatusReachableViaWWAN ||
-                status == AFNetworkReachabilityStatusReachableViaWiFi) {
-                sself.networkReachable = YES;
-                
-                // Reconnect
-                if ([sself isDisconnected] && [self _checkNeedReconnectTimer]) {
-                    [sself _connect];
-                    [sself _resetConnect];
-                    [sself _startReconnectTimer];
-                }
-            } else {
-                sself.networkReachable = NO;
+    __weak __typeof(self)wself = self;
+    void (^block)(BOOL reachable) = ^(BOOL reachable) {
+        __strong __typeof(wself)sself = wself;
+        if (reachable) {
+            sself.networkReachable = YES;
+            // Reconnect
+            if ([sself isDisconnected] && [self _checkNeedReconnectTimer]) {
+                [sself _connect];
+                [sself _resetConnect];
+                [sself _startReconnectTimer];
             }
-        };
-        dispatch_async(sself.socketQueue, block);
-    }];
-    [self.reach startMonitoring];
+        } else {
+            sself.networkReachable = NO;
+        }
+    };
+    
+    self.ref = SCNetworkReachabilityCreateWithName(NULL, [self.host UTF8String]);
+    SCNetworkReachabilityContext context = { 0, (__bridge void *)block, DDNetworkReachabilityRetainCallback, DDNetworkReachabilityReleaseCallback, NULL };
+    SCNetworkReachabilitySetCallback(self.ref, DDNetworkReachilityCallBack, &context);
+    SCNetworkReachabilitySetDispatchQueue(self.ref, self.socketQueue);
+    
+    SCNetworkReachabilityFlags flags;
+    SCNetworkReachabilityGetFlags(self.ref, &flags);
+    self.networkReachable = ((flags & kSCNetworkReachabilityFlagsReachable) != 0);
 }
 
 - (void)_stopMonitoring {
-    [self.reach stopMonitoring];
-    [self setReach:nil];
+    SCNetworkReachabilitySetDispatchQueue(self.ref, NULL);
 }
 
 #pragma mark - Send Heart
