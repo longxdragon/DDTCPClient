@@ -7,6 +7,7 @@
 //
 
 #import "DDTCPClient.h"
+#import <netinet/in.h>
 #import <CocoaAsyncSocket/GCDAsyncSocket.h>
 #import <SystemConfiguration/SystemConfiguration.h>
 
@@ -102,9 +103,17 @@ static NSInteger DDSocketTag = 0;
         self.reconnectCount = 10;
         self.reconnectFlag = 0;
         self.isDebug = NO;
-        
-        self.networkReachable = YES;
         self.needReconnect = YES;
+        
+        // Network reachability
+        struct sockaddr_in addr;
+        bzero(&addr, sizeof(addr));
+        addr.sin_len = sizeof(addr);
+        addr.sin_family = AF_INET;
+        self.ref = SCNetworkReachabilityCreateWithAddress(kCFAllocatorDefault, (const struct sockaddr *)&addr);
+        SCNetworkReachabilityFlags flags;
+        SCNetworkReachabilityGetFlags(self.ref, &flags);
+        self.networkReachable = ((flags & kSCNetworkReachabilityFlagsReachable) != 0);
     }
     return self;
 }
@@ -129,15 +138,9 @@ static NSInteger DDSocketTag = 0;
             sself.networkReachable = NO;
         }
     };
-    
-    self.ref = SCNetworkReachabilityCreateWithName(NULL, [self.host UTF8String]);
     SCNetworkReachabilityContext context = { 0, (__bridge void *)block, DDNetworkReachabilityRetainCallback, DDNetworkReachabilityReleaseCallback, NULL };
     SCNetworkReachabilitySetCallback(self.ref, DDNetworkReachilityCallBack, &context);
     SCNetworkReachabilitySetDispatchQueue(self.ref, self.socketQueue);
-    
-    SCNetworkReachabilityFlags flags;
-    SCNetworkReachabilityGetFlags(self.ref, &flags);
-    self.networkReachable = ((flags & kSCNetworkReachabilityFlagsReachable) != 0);
 }
 
 - (void)_stopMonitoring {
