@@ -2,7 +2,7 @@
 Pod::Spec.new do |s|
 
   s.name         = "DDTCPClient"
-  s.version      = "0.0.5"
+  s.version      = "0.0.6"
   s.summary      = "A client of socket"
 
   s.homepage     = "https://github.com/longxdragon/DDTCPClient"
