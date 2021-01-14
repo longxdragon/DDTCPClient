@@ -199,7 +199,7 @@ static NSInteger DDSocketTag = 0;
 }
 
 - (BOOL)_checkNeedReconnectTimer {
-    return (_needReconnect = YES && _reconnectTimer == nil);
+    return (_needReconnect && _reconnectTimer == nil);
 }
 
 - (void)_reconnect {
