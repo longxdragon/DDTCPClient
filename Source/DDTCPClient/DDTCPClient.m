@@ -50,7 +50,6 @@ static void DDNetworkReachabilityReleaseCallback(const void *info) {
 
 // Edit in receive queue
 @property (nonatomic, strong) NSMutableData *buffer;
-@property (nonatomic, assign) BOOL isReading;
 
 @end
 
@@ -92,7 +91,6 @@ static NSInteger DDSocketTag = 0;
         
         self.buffer = [NSMutableData data];
         self.buffer.length = 0;
-        self.isReading = NO;
         
         IsOnSocketQueueOrTargetQueueKey = &IsOnSocketQueueOrTargetQueueKey;
         void *nonNullUnusedPointer = (__bridge void *)self;
@@ -315,11 +313,6 @@ static NSInteger DDSocketTag = 0;
 }
 
 - (void)_didReadData {
-    if (self.isReading) {
-        return;
-    }
-    self.isReading = YES;
-    
     // Run in receiveQueue, change to socketQueue
     dispatch_async(self.socketQueue, ^{
         [self.socket readDataWithTimeout:DDSocketTimeout tag:DDSocketTag];
@@ -474,7 +467,6 @@ static NSInteger DDSocketTag = 0;
     }
     // Reset default value
     self.buffer.length = 0;
-    self.isReading = NO;
     
     if (self.delegate && [self.delegate respondsToSelector:@selector(client:didConnect:port:)]) {
         [self.delegate client:self didConnect:host port:port];
@@ -514,9 +506,7 @@ static NSInteger DDSocketTag = 0;
 - (void)socket:(GCDAsyncSocket *)sock didReadData:(NSData *)data withTag:(long)tag {
     if (self.isDebug) {
         NSLog(@"%@ -- <%p> host: %@ port: %d did receive data", NSStringFromClass([self class]), self, self.socketHost, self.socketPort);
-    }
-    self.isReading = NO;
-    
+    }    
     [self _didReceiveData:data];
     [self _didReadData];
 }
