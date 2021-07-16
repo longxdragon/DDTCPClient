@@ -51,6 +51,9 @@
 // The time interval of reconnect. Default is 10s
 @property (nonatomic, assign) NSTimeInterval reconnectTimeInterval;
 
+// The time interval of connenting. Default is 5s
+@property (nonatomic, assign) NSTimeInterval connectTimeInterval;
+
 // The count of reconnect. Default is 10
 @property (nonatomic, assign) NSInteger reconnectCount;
 

@@ -53,7 +53,7 @@ static void DDNetworkReachabilityReleaseCallback(const void *info) {
 
 @end
 
-static NSTimeInterval DDSocketTimeout = -1;
+static NSTimeInterval DDSocketReadWriteTimeout = 10;
 static NSInteger DDSocketTag = 0;
 
 @implementation DDTCPClient {
@@ -100,6 +100,7 @@ static NSInteger DDSocketTag = 0;
         self.reconnectTimeInterval = 10;
         self.reconnectCount = 10;
         self.reconnectFlag = 0;
+        self.connectTimeInterval = 5;
         self.isDebug = NO;
         self.needReconnect = YES;
         
@@ -257,7 +258,7 @@ static NSInteger DDSocketTag = 0;
     }
     
     NSError *error;
-    [self.socket connectToHost:self.host onPort:self.port error:&error];
+    [self.socket connectToHost:self.host onPort:self.port withTimeout:self.connectTimeInterval error:&error];
     if (error) {
         if (self.isDebug) {
             NSLog(@"%@ -- <%p> host: %@ port: %d connect error: %@", NSStringFromClass([self class]), self, self.host, self.port, error);
@@ -273,7 +274,7 @@ static NSInteger DDSocketTag = 0;
     if (self.socket.isDisconnected) {
         [self _connect];
     }
-    [self.socket writeData:data withTimeout:DDSocketTimeout tag:DDSocketTag];
+    [self.socket writeData:data withTimeout:DDSocketReadWriteTimeout tag:DDSocketTag];
 }
 
 // Handle on receiveQueue (Serial queue), so nolock.
@@ -315,7 +316,7 @@ static NSInteger DDSocketTag = 0;
 - (void)_didReadData {
     // Run in receiveQueue, change to socketQueue
     dispatch_async(self.socketQueue, ^{
-        [self.socket readDataWithTimeout:DDSocketTimeout tag:DDSocketTag];
+        [self.socket readDataWithTimeout:DDSocketReadWriteTimeout tag:DDSocketTag];
     });
 }
 
