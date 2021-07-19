@@ -53,7 +53,7 @@ static void DDNetworkReachabilityReleaseCallback(const void *info) {
 
 @end
 
-static NSTimeInterval DDSocketReadWriteTimeout = 10;
+static NSTimeInterval DDSocketReadWriteTimeout = -1;
 static NSInteger DDSocketTag = 0;
 
 @implementation DDTCPClient {
